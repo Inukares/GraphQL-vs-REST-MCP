@@ -132,12 +132,14 @@ export async function runGraphQLAgent(task: string): Promise<{
   tokenUsage: { input: number; output: number };
   apiCalls: number;
   latencyMs: number;
+  apiResponses: Array<{ query: string; response: unknown }>;
 }> {
   const startTime = performance.now();
   
   let apiCallCount = 0;
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
+  const apiResponses: Array<{ query: string; response: unknown }> = [];
 
   const messages: Anthropic.MessageParam[] = [
     {
@@ -170,6 +172,10 @@ export async function runGraphQLAgent(task: string): Promise<{
           apiCallCount++;
           const input = block.input as { query: string };
           const result = await callGraphQLApi(input.query);
+          apiResponses.push({
+            query: input.query,
+            response: JSON.parse(result),
+          });
           (toolResults.content as Anthropic.ToolResultBlockParam[]).push({
             type: "tool_result",
             tool_use_id: block.id,
@@ -196,6 +202,7 @@ export async function runGraphQLAgent(task: string): Promise<{
         },
         apiCalls: apiCallCount,
         latencyMs: endTime - startTime,
+        apiResponses,
       };
     }
   }

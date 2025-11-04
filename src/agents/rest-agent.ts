@@ -168,12 +168,14 @@ export async function runRestAgent(task: string): Promise<{
   tokenUsage: { input: number; output: number };
   apiCalls: number;
   latencyMs: number;
+  apiResponses: Array<{ tool: string; response: unknown }>;
 }> {
   const startTime = performance.now();
   
   let apiCallCount = 0;
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
+  const apiResponses: Array<{ tool: string; response: unknown }> = [];
 
   const messages: Anthropic.MessageParam[] = [
     {
@@ -205,6 +207,10 @@ export async function runRestAgent(task: string): Promise<{
         if (block.type === "tool_use") {
           apiCallCount++;
           const result = await callRestApi(block.name, block.input as Record<string, string>);
+          apiResponses.push({
+            tool: block.name,
+            response: JSON.parse(result),
+          });
           (toolResults.content as Anthropic.ToolResultBlockParam[]).push({
             type: "tool_result",
             tool_use_id: block.id,
@@ -231,6 +237,7 @@ export async function runRestAgent(task: string): Promise<{
         },
         apiCalls: apiCallCount,
         latencyMs: endTime - startTime,
+        apiResponses,
       };
     }
   }

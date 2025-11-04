@@ -1,11 +1,18 @@
 import { runRestAgent } from "./rest-agent";
 import { runGraphQLAgent } from "./graphql-agent";
 
+interface ApiCall {
+  tool?: string;
+  query?: string;
+  response: unknown;
+}
+
 interface AgentResult {
   result: string;
   tokenUsage: { input: number; output: number };
   apiCalls: number;
   latencyMs: number;
+  apiResponses: ApiCall[];
 }
 
 function printResults(restResult: AgentResult, graphqlResult: AgentResult) {
@@ -16,36 +23,64 @@ function printResults(restResult: AgentResult, graphqlResult: AgentResult) {
   console.log("🔴 REST API Approach");
   console.log("-".repeat(80));
   console.log(`Result: ${restResult.result}`);
-  console.log(`\n📈 Metrics:`);
-  console.log(`  • API Calls: ${restResult.apiCalls}`);
-  console.log(`  • Latency: ${restResult.latencyMs.toFixed(0)}ms`);
-  console.log(`  • Input Tokens: ${restResult.tokenUsage.input.toLocaleString()}`);
-  console.log(`  • Output Tokens: ${restResult.tokenUsage.output.toLocaleString()}`);
-  console.log(`  • Total Tokens: ${(restResult.tokenUsage.input + restResult.tokenUsage.output).toLocaleString()}`);
+  console.log(`\n📡 API Calls Made (${restResult.apiCalls} total):`);
+  restResult.apiResponses.forEach((call: ApiCall, idx: number) => {
+    const toolToUrl: Record<string, string> = {
+      get_user: "GET /rest/users/{id}",
+      get_user_posts: "GET /rest/users/{id}/posts",
+      get_post: "GET /rest/posts/{id}",
+      get_post_author: "GET /rest/posts/{id}/author",
+      get_post_comments: "GET /rest/posts/{id}/comments",
+      get_comment_author: "GET /rest/comments/{id}/author",
+      create_comment: "POST /rest/comments",
+    };
+    const url = toolToUrl[call.tool || ""] || call.tool;
+    console.log(`  ${idx + 1}. ${url}`);
+  });
 
   console.log("\n🟢 GraphQL API Approach");
   console.log("-".repeat(80));
   console.log(`Result: ${graphqlResult.result}`);
-  console.log(`\n📈 Metrics:`);
-  console.log(`  • API Calls: ${graphqlResult.apiCalls}`);
-  console.log(`  • Latency: ${graphqlResult.latencyMs.toFixed(0)}ms`);
-  console.log(`  • Input Tokens: ${graphqlResult.tokenUsage.input.toLocaleString()}`);
-  console.log(`  • Output Tokens: ${graphqlResult.tokenUsage.output.toLocaleString()}`);
-  console.log(`  • Total Tokens: ${(graphqlResult.tokenUsage.input + graphqlResult.tokenUsage.output).toLocaleString()}`);
+  console.log(`\n📡 GraphQL Queries Made (${graphqlResult.apiCalls} total):`);
+  graphqlResult.apiResponses.forEach((call: ApiCall, idx: number) => {
+    console.log(`  ${idx + 1}. Query:`);
+    const formattedQuery = call.query?.trim().replace(/\n/g, "\n     ");
+    console.log(`     ${formattedQuery}`);
+  });
+
+  console.log("\n📊 Metrics Comparison Table");
+  console.log("-".repeat(80));
+  
+  const restTotal = restResult.tokenUsage.input + restResult.tokenUsage.output;
+  const graphqlTotal = graphqlResult.tokenUsage.input + graphqlResult.tokenUsage.output;
+  
+  const metrics = [
+    ["Metric", "REST", "GraphQL", "Difference"],
+    ["─".repeat(20), "─".repeat(15), "─".repeat(15), "─".repeat(20)],
+    ["API Calls", restResult.apiCalls.toString(), graphqlResult.apiCalls.toString(), `${restResult.apiCalls - graphqlResult.apiCalls} fewer`],
+    ["Latency", `${restResult.latencyMs.toFixed(0)}ms`, `${graphqlResult.latencyMs.toFixed(0)}ms`, `${(restResult.latencyMs - graphqlResult.latencyMs).toFixed(0)}ms faster`],
+    ["Input Tokens", restResult.tokenUsage.input.toLocaleString(), graphqlResult.tokenUsage.input.toLocaleString(), `${(restResult.tokenUsage.input - graphqlResult.tokenUsage.input).toLocaleString()}`],
+    ["Output Tokens", restResult.tokenUsage.output.toLocaleString(), graphqlResult.tokenUsage.output.toLocaleString(), `${(restResult.tokenUsage.output - graphqlResult.tokenUsage.output).toLocaleString()}`],
+    ["Total Tokens", restTotal.toLocaleString(), graphqlTotal.toLocaleString(), `${(restTotal - graphqlTotal).toLocaleString()}`],
+  ];
+  
+  const colWidths = [22, 17, 17, 22];
+  metrics.forEach((row) => {
+    const formattedRow = row.map((cell, idx) => cell.padEnd(colWidths[idx])).join(" │ ");
+    console.log(`  ${formattedRow}`);
+  });
 
   console.log("\n💡 Analysis");
   console.log("-".repeat(80));
 
-  const restTotal = restResult.tokenUsage.input + restResult.tokenUsage.output;
-  const graphqlTotal = graphqlResult.tokenUsage.input + graphqlResult.tokenUsage.output;
   const tokenSavings = restTotal - graphqlTotal;
-  const tokenSavingsPercent = ((tokenSavings / restTotal) * 100).toFixed(1);
+  const tokenSavingsPercent = restTotal > 0 ? ((tokenSavings / restTotal) * 100).toFixed(1) : "0.0";
 
   const apiCallReduction = restResult.apiCalls - graphqlResult.apiCalls;
-  const apiCallReductionPercent = ((apiCallReduction / restResult.apiCalls) * 100).toFixed(1);
+  const apiCallReductionPercent = restResult.apiCalls > 0 ? ((apiCallReduction / restResult.apiCalls) * 100).toFixed(1) : "0.0";
 
   const latencySavings = restResult.latencyMs - graphqlResult.latencyMs;
-  const latencySavingsPercent = ((latencySavings / restResult.latencyMs) * 100).toFixed(1);
+  const latencySavingsPercent = restResult.latencyMs > 0 ? ((latencySavings / restResult.latencyMs) * 100).toFixed(1) : "0.0";
 
   console.log(`  • Token Savings: ${tokenSavings.toLocaleString()} tokens (${tokenSavingsPercent}% reduction)`);
   console.log(`  • API Call Reduction: ${apiCallReduction} fewer calls (${apiCallReductionPercent}% reduction)`);
