@@ -54,17 +54,38 @@ function printResults(restResult: AgentResult, graphqlResult: AgentResult) {
   const restTotal = restResult.tokenUsage.input + restResult.tokenUsage.output;
   const graphqlTotal = graphqlResult.tokenUsage.input + graphqlResult.tokenUsage.output;
   
+  const apiCallDiff = restResult.apiCalls - graphqlResult.apiCalls;
+  const latencyDiff = restResult.latencyMs - graphqlResult.latencyMs;
+  const inputTokenDiff = restResult.tokenUsage.input - graphqlResult.tokenUsage.input;
+  const outputTokenDiff = restResult.tokenUsage.output - graphqlResult.tokenUsage.output;
+  const totalTokenDiff = restTotal - graphqlTotal;
+
+  const getWinner = (diff: number, lowerBetter: boolean = true): string => {
+    if (diff === 0) return "Tie";
+    if (lowerBetter) {
+      return diff > 0 ? "GraphQL ✅" : "REST ✅";
+    }
+    return diff > 0 ? "REST ✅" : "GraphQL ✅";
+  };
+
+  const formatDiff = (diff: number, unit: string = ""): string => {
+    if (diff === 0) return "0" + unit;
+    const absValue = Math.abs(diff);
+    const sign = diff > 0 ? "-" : "+";
+    return `${sign}${absValue.toLocaleString()}${unit}`;
+  };
+
   const metrics = [
-    ["Metric", "REST", "GraphQL", "Difference"],
-    ["─".repeat(20), "─".repeat(15), "─".repeat(15), "─".repeat(20)],
-    ["API Calls", restResult.apiCalls.toString(), graphqlResult.apiCalls.toString(), `${restResult.apiCalls - graphqlResult.apiCalls} fewer`],
-    ["Latency", `${restResult.latencyMs.toFixed(0)}ms`, `${graphqlResult.latencyMs.toFixed(0)}ms`, `${(restResult.latencyMs - graphqlResult.latencyMs).toFixed(0)}ms faster`],
-    ["Input Tokens", restResult.tokenUsage.input.toLocaleString(), graphqlResult.tokenUsage.input.toLocaleString(), `${(restResult.tokenUsage.input - graphqlResult.tokenUsage.input).toLocaleString()}`],
-    ["Output Tokens", restResult.tokenUsage.output.toLocaleString(), graphqlResult.tokenUsage.output.toLocaleString(), `${(restResult.tokenUsage.output - graphqlResult.tokenUsage.output).toLocaleString()}`],
-    ["Total Tokens", restTotal.toLocaleString(), graphqlTotal.toLocaleString(), `${(restTotal - graphqlTotal).toLocaleString()}`],
+    ["Metric", "REST", "GraphQL", "Difference", "Winner"],
+    ["─".repeat(18), "─".repeat(13), "─".repeat(13), "─".repeat(13), "─".repeat(13)],
+    ["API Calls", restResult.apiCalls.toString(), graphqlResult.apiCalls.toString(), formatDiff(apiCallDiff), getWinner(apiCallDiff, true)],
+    ["Latency", `${restResult.latencyMs.toFixed(0)}ms`, `${graphqlResult.latencyMs.toFixed(0)}ms`, formatDiff(latencyDiff, "ms"), getWinner(latencyDiff, true)],
+    ["Input Tokens", restResult.tokenUsage.input.toLocaleString(), graphqlResult.tokenUsage.input.toLocaleString(), formatDiff(inputTokenDiff), getWinner(inputTokenDiff, true)],
+    ["Output Tokens", restResult.tokenUsage.output.toLocaleString(), graphqlResult.tokenUsage.output.toLocaleString(), formatDiff(outputTokenDiff), getWinner(outputTokenDiff, true)],
+    ["Total Tokens", restTotal.toLocaleString(), graphqlTotal.toLocaleString(), formatDiff(totalTokenDiff), getWinner(totalTokenDiff, true)],
   ];
   
-  const colWidths = [22, 17, 17, 22];
+  const colWidths = [20, 15, 15, 15, 15];
   metrics.forEach((row) => {
     const formattedRow = row.map((cell, idx) => cell.padEnd(colWidths[idx])).join(" │ ");
     console.log(`  ${formattedRow}`);
@@ -73,25 +94,40 @@ function printResults(restResult: AgentResult, graphqlResult: AgentResult) {
   console.log("\n💡 Analysis");
   console.log("-".repeat(80));
 
-  const tokenSavings = restTotal - graphqlTotal;
-  const tokenSavingsPercent = restTotal > 0 ? ((tokenSavings / restTotal) * 100).toFixed(1) : "0.0";
+  const tokenDiffPercent = restTotal > 0 ? Math.abs((totalTokenDiff / restTotal) * 100).toFixed(1) : "0.0";
+  const apiCallDiffPercent = restResult.apiCalls > 0 ? Math.abs((apiCallDiff / restResult.apiCalls) * 100).toFixed(1) : "0.0";
+  const latencyDiffPercent = restResult.latencyMs > 0 ? Math.abs((latencyDiff / restResult.latencyMs) * 100).toFixed(1) : "0.0";
 
-  const apiCallReduction = restResult.apiCalls - graphqlResult.apiCalls;
-  const apiCallReductionPercent = restResult.apiCalls > 0 ? ((apiCallReduction / restResult.apiCalls) * 100).toFixed(1) : "0.0";
-
-  const latencySavings = restResult.latencyMs - graphqlResult.latencyMs;
-  const latencySavingsPercent = restResult.latencyMs > 0 ? ((latencySavings / restResult.latencyMs) * 100).toFixed(1) : "0.0";
-
-  console.log(`  • Token Savings: ${tokenSavings.toLocaleString()} tokens (${tokenSavingsPercent}% reduction)`);
-  console.log(`  • API Call Reduction: ${apiCallReduction} fewer calls (${apiCallReductionPercent}% reduction)`);
-  console.log(`  • Latency Improvement: ${latencySavings.toFixed(0)}ms faster (${latencySavingsPercent}% faster)`);
-
-  if (tokenSavings > 0) {
-    console.log(`  • GraphQL was more efficient ✅`);
-  } else if (tokenSavings < 0) {
-    console.log(`  • REST was more efficient ✅`);
+  if (totalTokenDiff > 0) {
+    console.log(`  • Token Usage: GraphQL used ${totalTokenDiff.toLocaleString()} fewer tokens (${tokenDiffPercent}% reduction)`);
+  } else if (totalTokenDiff < 0) {
+    console.log(`  • Token Usage: GraphQL used ${Math.abs(totalTokenDiff).toLocaleString()} more tokens (${tokenDiffPercent}% increase)`);
   } else {
-    console.log(`  • Both approaches were equally efficient 🤝`);
+    console.log(`  • Token Usage: Both used the same number of tokens`);
+  }
+
+  if (apiCallDiff > 0) {
+    console.log(`  • API Calls: GraphQL made ${apiCallDiff} fewer calls (${apiCallDiffPercent}% reduction)`);
+  } else if (apiCallDiff < 0) {
+    console.log(`  • API Calls: GraphQL made ${Math.abs(apiCallDiff)} more calls (${apiCallDiffPercent}% increase)`);
+  } else {
+    console.log(`  • API Calls: Both made the same number of calls`);
+  }
+
+  if (latencyDiff > 0) {
+    console.log(`  • Latency: GraphQL was ${latencyDiff.toFixed(0)}ms faster (${latencyDiffPercent}% improvement)`);
+  } else if (latencyDiff < 0) {
+    console.log(`  • Latency: GraphQL was ${Math.abs(latencyDiff).toFixed(0)}ms slower (${latencyDiffPercent}% slower)`);
+  } else {
+    console.log(`  • Latency: Both had the same latency`);
+  }
+
+  if (totalTokenDiff > 0) {
+    console.log(`\n  ✅ Overall: GraphQL was more efficient`);
+  } else if (totalTokenDiff < 0) {
+    console.log(`\n  ✅ Overall: REST was more efficient`);
+  } else {
+    console.log(`\n  🤝 Overall: Both approaches were equally efficient`);
   }
 
   console.log("\n📝 Key Takeaways");
