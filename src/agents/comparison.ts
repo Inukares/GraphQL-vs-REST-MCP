@@ -5,6 +5,7 @@ interface AgentResult {
   result: string;
   tokenUsage: { input: number; output: number };
   apiCalls: number;
+  latencyMs: number;
 }
 
 function printResults(restResult: AgentResult, graphqlResult: AgentResult) {
@@ -17,6 +18,7 @@ function printResults(restResult: AgentResult, graphqlResult: AgentResult) {
   console.log(`Result: ${restResult.result}`);
   console.log(`\n📈 Metrics:`);
   console.log(`  • API Calls: ${restResult.apiCalls}`);
+  console.log(`  • Latency: ${restResult.latencyMs.toFixed(0)}ms`);
   console.log(`  • Input Tokens: ${restResult.tokenUsage.input.toLocaleString()}`);
   console.log(`  • Output Tokens: ${restResult.tokenUsage.output.toLocaleString()}`);
   console.log(`  • Total Tokens: ${(restResult.tokenUsage.input + restResult.tokenUsage.output).toLocaleString()}`);
@@ -26,6 +28,7 @@ function printResults(restResult: AgentResult, graphqlResult: AgentResult) {
   console.log(`Result: ${graphqlResult.result}`);
   console.log(`\n📈 Metrics:`);
   console.log(`  • API Calls: ${graphqlResult.apiCalls}`);
+  console.log(`  • Latency: ${graphqlResult.latencyMs.toFixed(0)}ms`);
   console.log(`  • Input Tokens: ${graphqlResult.tokenUsage.input.toLocaleString()}`);
   console.log(`  • Output Tokens: ${graphqlResult.tokenUsage.output.toLocaleString()}`);
   console.log(`  • Total Tokens: ${(graphqlResult.tokenUsage.input + graphqlResult.tokenUsage.output).toLocaleString()}`);
@@ -41,8 +44,12 @@ function printResults(restResult: AgentResult, graphqlResult: AgentResult) {
   const apiCallReduction = restResult.apiCalls - graphqlResult.apiCalls;
   const apiCallReductionPercent = ((apiCallReduction / restResult.apiCalls) * 100).toFixed(1);
 
+  const latencySavings = restResult.latencyMs - graphqlResult.latencyMs;
+  const latencySavingsPercent = ((latencySavings / restResult.latencyMs) * 100).toFixed(1);
+
   console.log(`  • Token Savings: ${tokenSavings.toLocaleString()} tokens (${tokenSavingsPercent}% reduction)`);
   console.log(`  • API Call Reduction: ${apiCallReduction} fewer calls (${apiCallReductionPercent}% reduction)`);
+  console.log(`  • Latency Improvement: ${latencySavings.toFixed(0)}ms faster (${latencySavingsPercent}% faster)`);
 
   if (tokenSavings > 0) {
     console.log(`  • GraphQL was more efficient ✅`);
@@ -71,15 +78,15 @@ async function main() {
   const testTasks = [
     {
       name: "Simple User Query",
-      task: "Get information about user with ID 1, including their name and email.",
+      task: "Get information about user with ID 1. Fetch the user's id, name, and email.",
     },
     {
       name: "Hierarchical Data Query",
-      task: "Get all posts by user with ID 1, and for each post, show the title, number of likes, and all comments with their authors' names.",
+      task: "Get all posts by user with ID 1. For each post, fetch: id, title, content, likes. For each post, also fetch all comments. For each comment, fetch: id, content, createdAt, and the author's name.",
     },
     {
       name: "Deep Nested Query",
-      task: "Get the post with ID 5, including the post title, author's name and email, and all comments on that post with each comment's content, creation time, and the comment author's name.",
+      task: "Get the post with ID 5. Fetch: id, title, content, likes. Also fetch the post author's id, name, and email. Also fetch all comments on that post - for each comment fetch: id, content, createdAt, and the comment author's id and name.",
     },
   ];
 

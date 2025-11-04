@@ -1,6 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-
-const BASE_URL = "http://localhost:3000";
+import { CLAUDE_MODEL, BASE_URL } from "../constants";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -168,7 +167,10 @@ export async function runRestAgent(task: string): Promise<{
   result: string;
   tokenUsage: { input: number; output: number };
   apiCalls: number;
+  latencyMs: number;
 }> {
+  const startTime = performance.now();
+  
   let apiCallCount = 0;
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
@@ -184,8 +186,8 @@ export async function runRestAgent(task: string): Promise<{
 
   while (continueLoop) {
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 4096,
+      model: CLAUDE_MODEL,
+      max_tokens: 9000,
       tools,
       messages,
     });
@@ -217,6 +219,7 @@ export async function runRestAgent(task: string): Promise<{
       });
       messages.push(toolResults);
     } else {
+      const endTime = performance.now();
       const textBlock = response.content.find((block) => block.type === "text");
       const finalAnswer = textBlock && "text" in textBlock ? textBlock.text : "No response";
 
@@ -227,6 +230,7 @@ export async function runRestAgent(task: string): Promise<{
           output: totalOutputTokens,
         },
         apiCalls: apiCallCount,
+        latencyMs: endTime - startTime,
       };
     }
   }

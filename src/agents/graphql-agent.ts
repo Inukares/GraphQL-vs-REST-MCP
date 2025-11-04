@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { CLAUDE_MODEL, BASE_URL } from "../constants";
 
-const BASE_URL = "http://localhost:3000/graphql";
+const GRAPHQL_URL = `${BASE_URL}/graphql`;
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -81,6 +82,15 @@ type Comment {
 }
 `;
 
+const boostActive = true
+
+const toolEfficiencyBoost = boostActive ? `
+You can fetch nested data in a single query. For example:
+- Get a user with all their posts: query { user(id: "1") { id name posts { title } } }
+- Get a post with author and comments: query { post(id: "1") { title author { name } comments { content author { name } } } }
+- Create a comment: mutation { createComment(postId: "1", authorId: "2", content: "Great post!") { id content createdAt } }
+` : ''
+
 const tools: Anthropic.Tool[] = [
   {
     name: "graphql_query",
@@ -88,10 +98,7 @@ const tools: Anthropic.Tool[] = [
 
 ${GRAPHQL_SCHEMA}
 
-You can fetch nested data in a single query. For example:
-- Get a user with all their posts: query { user(id: "1") { id name posts { title } } }
-- Get a post with author and comments: query { post(id: "1") { title author { name } comments { content author { name } } } }
-- Create a comment: mutation { createComment(postId: "1", authorId: "2", content: "Great post!") { id content createdAt } }
+${toolEfficiencyBoost}
 
 Use nested queries to fetch related data efficiently in a single request.`,
     input_schema: {
@@ -108,7 +115,7 @@ Use nested queries to fetch related data efficiently in a single request.`,
 ];
 
 async function callGraphQLApi(query: string): Promise<string> {
-  const response = await fetch(BASE_URL, {
+  const response = await fetch(GRAPHQL_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -124,7 +131,10 @@ export async function runGraphQLAgent(task: string): Promise<{
   result: string;
   tokenUsage: { input: number; output: number };
   apiCalls: number;
+  latencyMs: number;
 }> {
+  const startTime = performance.now();
+  
   let apiCallCount = 0;
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
@@ -140,8 +150,8 @@ export async function runGraphQLAgent(task: string): Promise<{
 
   while (continueLoop) {
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 4096,
+      model: CLAUDE_MODEL,
+      max_tokens: 9000,
       tools,
       messages,
     });
@@ -174,6 +184,7 @@ export async function runGraphQLAgent(task: string): Promise<{
       });
       messages.push(toolResults);
     } else {
+      const endTime = performance.now();
       const textBlock = response.content.find((block) => block.type === "text");
       const finalAnswer = textBlock && "text" in textBlock ? textBlock.text : "No response";
 
@@ -184,6 +195,7 @@ export async function runGraphQLAgent(task: string): Promise<{
           output: totalOutputTokens,
         },
         apiCalls: apiCallCount,
+        latencyMs: endTime - startTime,
       };
     }
   }
