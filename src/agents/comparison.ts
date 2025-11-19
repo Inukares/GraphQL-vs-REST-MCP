@@ -5,6 +5,7 @@ interface ApiCall {
   tool?: string;
   query?: string;
   response: unknown;
+  url?: string;
 }
 
 interface AgentResult {
@@ -25,17 +26,7 @@ function printResults(restResult: AgentResult, graphqlResult: AgentResult) {
   console.log(`Result: ${restResult.result}`);
   console.log(`\n📡 API Calls Made (${restResult.apiCalls} total):`);
   restResult.apiResponses.forEach((call: ApiCall, idx: number) => {
-    const toolToUrl: Record<string, string> = {
-      get_user: "GET /rest/users/{id}",
-      get_user_posts: "GET /rest/users/{id}/posts",
-      get_post: "GET /rest/posts/{id}",
-      get_post_author: "GET /rest/posts/{id}/author",
-      get_post_comments: "GET /rest/posts/{id}/comments",
-      get_comment_author: "GET /rest/comments/{id}/author",
-      create_comment: "POST /rest/comments",
-    };
-    const url = toolToUrl[call.tool || ""] || call.tool;
-    console.log(`  ${idx + 1}. ${url}`);
+    console.log(`  ${idx + 1}. ${call.url}`);
   });
 
   console.log("\n🟢 GraphQL API Approach");

@@ -114,7 +114,7 @@ const tools: Anthropic.Tool[] = [
   },
 ];
 
-async function callRestApi(toolName: string, toolInput: Record<string, string>): Promise<string> {
+async function callRestApi(toolName: string, toolInput: Record<string, string>): Promise<{ result: string; url: string }> {
   let url: string;
   let method = "GET";
   let body: Record<string, string> | undefined;
@@ -160,7 +160,7 @@ async function callRestApi(toolName: string, toolInput: Record<string, string>):
 
   const response = await fetch(url, options);
   const data = await response.json();
-  return JSON.stringify(data);
+  return { result: JSON.stringify(data), url: `${method} ${url.replace(BASE_URL, "")}` };
 }
 
 export async function runRestAgent(task: string): Promise<{
@@ -168,14 +168,14 @@ export async function runRestAgent(task: string): Promise<{
   tokenUsage: { input: number; output: number };
   apiCalls: number;
   latencyMs: number;
-  apiResponses: Array<{ tool: string; response: unknown }>;
+  apiResponses: Array<{ tool: string; response: unknown; url: string }>;
 }> {
   const startTime = performance.now();
   
   let apiCallCount = 0;
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
-  const apiResponses: Array<{ tool: string; response: unknown }> = [];
+  const apiResponses: Array<{ tool: string; response: unknown; url: string }> = [];
 
   const messages: Anthropic.MessageParam[] = [
     {
@@ -203,20 +203,36 @@ export async function runRestAgent(task: string): Promise<{
         content: [],
       };
 
-      for (const block of response.content) {
-        if (block.type === "tool_use") {
+      const toolUseBlocks = response.content.filter(
+        (block) => block.type === "tool_use"
+      );
+
+      const results = await Promise.all(
+        toolUseBlocks.map(async (block) => {
+          if (block.type !== "tool_use") return null;
           apiCallCount++;
-          const result = await callRestApi(block.name, block.input as Record<string, string>);
-          apiResponses.push({
-            tool: block.name,
-            response: JSON.parse(result),
-          });
-          (toolResults.content as Anthropic.ToolResultBlockParam[]).push({
-            type: "tool_result",
-            tool_use_id: block.id,
-            content: result,
-          });
-        }
+          const { result, url } = await callRestApi(
+            block.name,
+            block.input as Record<string, string>
+          );
+          return { block, result, url };
+        })
+      );
+
+      for (const res of results) {
+        if (!res) continue;
+        const { block, result, url } = res;
+
+        apiResponses.push({
+          tool: block.name,
+          response: JSON.parse(result),
+          url,
+        });
+        (toolResults.content as Anthropic.ToolResultBlockParam[]).push({
+          type: "tool_result",
+          tool_use_id: block.id,
+          content: result,
+        });
       }
 
       messages.push({

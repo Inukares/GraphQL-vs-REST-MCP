@@ -82,7 +82,7 @@ type Comment {
 }
 `;
 
-const boostActive = true
+const boostActive = false
 
 const toolEfficiencyBoost = boostActive ? `
 You can fetch nested data in a single query. For example:
