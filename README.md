@@ -4,6 +4,8 @@ This project demonstrates the differences between GraphQL and REST APIs when use
 
 ## 🎯 Project Overview
 
+![Demo Screenshot](screenshot.png)
+
 This demo includes:
 - **Single Elysia server** serving both REST and GraphQL endpoints
 - **Mock data** (Users, Posts, Comments) with no database

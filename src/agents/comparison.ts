@@ -121,6 +121,10 @@ function printResults(restResult: AgentResult, graphqlResult: AgentResult) {
     console.log(`\n  🤝 Overall: Both approaches were equally efficient`);
   }
 
+  console.log("\n" + "=".repeat(80) + "\n");
+}
+
+function printKeyTakeaways() {
   console.log("\n📝 Key Takeaways");
   console.log("-".repeat(80));
   console.log("  1. GraphQL reduces API roundtrips by fetching hierarchical data in one query");
@@ -166,6 +170,8 @@ async function main() {
 
     printResults(restResult, graphqlResult);
   }
+
+  printKeyTakeaways();
 
   console.log("\n✅ All tests completed!\n");
 }
