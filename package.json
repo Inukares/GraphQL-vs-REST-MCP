@@ -3,9 +3,11 @@
   "version": "1.0.50",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "bun run --watch src/index.ts",
-    "start": "bun run src/index.ts",
-    "compare": "bun run src/agents/comparison.ts"
+    "dev": "bun run --watch src/server/index.ts",
+    "start": "bun run src/server/index.ts",
+    "compare": "bun run src/client/agents/comparison.ts",
+    "agent:rest": "bun run src/client/agents/rest-agent.ts",
+    "agent:graphql": "bun run src/client/agents/graphql-agent.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.68.0",

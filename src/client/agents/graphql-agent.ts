@@ -1,86 +1,12 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { CLAUDE_MODEL, BASE_URL } from "../constants";
+import { CLAUDE_MODEL, BASE_URL } from "../../shared/constants";
+import { typeDefs as GRAPHQL_SCHEMA } from "../../server/graphql/schema";
 
 const GRAPHQL_URL = `${BASE_URL}/graphql`;
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
-
-const GRAPHQL_SCHEMA = `
-type Query {
-  """Get a user by ID"""
-  user(id: ID!): User
-  
-  """Get a post by ID"""
-  post(id: ID!): Post
-  
-  """Get all users"""
-  users: [User!]!
-  
-  """Get all posts"""
-  posts: [Post!]!
-}
-
-type Mutation {
-  """Create a new comment on a post"""
-  createComment(postId: ID!, authorId: ID!, content: String!): Comment
-}
-
-"""A user in the system"""
-type User {
-  """Unique identifier for the user"""
-  id: ID!
-  
-  """User's full name"""
-  name: String!
-  
-  """User's email address"""
-  email: String!
-  
-  """All posts created by this user"""
-  posts: [Post!]!
-}
-
-"""A blog post"""
-type Post {
-  """Unique identifier for the post"""
-  id: ID!
-  
-  """Title of the post"""
-  title: String!
-  
-  """Content/body of the post"""
-  content: String!
-  
-  """The user who created this post"""
-  author: User!
-  
-  """All comments on this post"""
-  comments: [Comment!]!
-  
-  """Number of likes on this post"""
-  likes: Int!
-}
-
-"""A comment on a post"""
-type Comment {
-  """Unique identifier for the comment"""
-  id: ID!
-  
-  """Content of the comment"""
-  content: String!
-  
-  """The user who created this comment"""
-  author: User!
-  
-  """The post this comment belongs to"""
-  post: Post!
-  
-  """When the comment was created"""
-  createdAt: String!
-}
-`;
 
 const boostActive = false
 

@@ -209,7 +209,6 @@ export const comments: Comment[] = [
   },
 ];
 
-// Helper functions to query the mock data
 export function getUserById(id: string): User | undefined {
   return users.find((user) => user.id === id);
 }

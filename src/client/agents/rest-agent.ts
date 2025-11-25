@@ -1,118 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { CLAUDE_MODEL, BASE_URL } from "../constants";
+import { CLAUDE_MODEL, BASE_URL } from "../../shared/constants";
+import { REST_TOOLS } from "../definitions/rest-tools";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
-
-const tools: Anthropic.Tool[] = [
-  {
-    name: "get_user",
-    description: "Get a user by their ID. Returns user information including id, name, and email.",
-    input_schema: {
-      type: "object",
-      properties: {
-        id: {
-          type: "string",
-          description: "The ID of the user to retrieve",
-        },
-      },
-      required: ["id"],
-    },
-  },
-  {
-    name: "get_user_posts",
-    description: "Get all posts created by a specific user.",
-    input_schema: {
-      type: "object",
-      properties: {
-        userId: {
-          type: "string",
-          description: "The ID of the user whose posts to retrieve",
-        },
-      },
-      required: ["userId"],
-    },
-  },
-  {
-    name: "get_post",
-    description: "Get a post by its ID. Returns post information including id, title, content, authorId, and likes.",
-    input_schema: {
-      type: "object",
-      properties: {
-        id: {
-          type: "string",
-          description: "The ID of the post to retrieve",
-        },
-      },
-      required: ["id"],
-    },
-  },
-  {
-    name: "get_post_author",
-    description: "Get the author of a specific post.",
-    input_schema: {
-      type: "object",
-      properties: {
-        postId: {
-          type: "string",
-          description: "The ID of the post whose author to retrieve",
-        },
-      },
-      required: ["postId"],
-    },
-  },
-  {
-    name: "get_post_comments",
-    description: "Get all comments on a specific post.",
-    input_schema: {
-      type: "object",
-      properties: {
-        postId: {
-          type: "string",
-          description: "The ID of the post whose comments to retrieve",
-        },
-      },
-      required: ["postId"],
-    },
-  },
-  {
-    name: "get_comment_author",
-    description: "Get the author of a specific comment.",
-    input_schema: {
-      type: "object",
-      properties: {
-        commentId: {
-          type: "string",
-          description: "The ID of the comment whose author to retrieve",
-        },
-      },
-      required: ["commentId"],
-    },
-  },
-  {
-    name: "create_comment",
-    description: "Create a new comment on a post.",
-    input_schema: {
-      type: "object",
-      properties: {
-        postId: {
-          type: "string",
-          description: "The ID of the post to comment on",
-        },
-        authorId: {
-          type: "string",
-          description: "The ID of the user creating the comment",
-        },
-        content: {
-          type: "string",
-          description: "The content of the comment",
-        },
-      },
-      required: ["postId", "authorId", "content"],
-    },
-  },
-];
 
 async function callRestApi(toolName: string, toolInput: Record<string, string>): Promise<{ result: string; url: string }> {
   let url: string;
@@ -190,7 +82,7 @@ export async function runRestAgent(task: string): Promise<{
     const response = await anthropic.messages.create({
       model: CLAUDE_MODEL,
       max_tokens: 9000,
-      tools,
+      tools: REST_TOOLS,
       messages,
     });
 
@@ -260,4 +152,3 @@ export async function runRestAgent(task: string): Promise<{
 
   throw new Error("Unexpected end of loop");
 }
-
