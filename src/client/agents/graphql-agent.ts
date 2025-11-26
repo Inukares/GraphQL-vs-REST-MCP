@@ -1,57 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { CLAUDE_MODEL, BASE_URL } from "../../shared/constants";
-import { typeDefs as GRAPHQL_SCHEMA } from "../../server/graphql/schema";
-
-const GRAPHQL_URL = `${BASE_URL}/graphql`;
+import { CLAUDE_MODEL } from "../../shared/constants";
+import { GraphqlMcpServer } from "../mcp/graphql-server";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
-
-const boostActive = false
-
-const toolEfficiencyBoost = boostActive ? `
-You can fetch nested data in a single query. For example:
-- Get a user with all their posts: query { user(id: "1") { id name posts { title } } }
-- Get a post with author and comments: query { post(id: "1") { title author { name } comments { content author { name } } } }
-- Create a comment: mutation { createComment(postId: "1", authorId: "2", content: "Great post!") { id content createdAt } }
-` : ''
-
-const tools: Anthropic.Tool[] = [
-  {
-    name: "graphql_query",
-    description: `Execute a GraphQL query or mutation against the API. The API supports the following schema:
-
-${GRAPHQL_SCHEMA}
-
-${toolEfficiencyBoost}
-
-Use nested queries to fetch related data efficiently in a single request.`,
-    input_schema: {
-      type: "object",
-      properties: {
-        query: {
-          type: "string",
-          description: "The GraphQL query or mutation to execute. Can include nested fields to fetch related data.",
-        },
-      },
-      required: ["query"],
-    },
-  },
-];
-
-async function callGraphQLApi(query: string): Promise<string> {
-  const response = await fetch(GRAPHQL_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ query }),
-  });
-
-  const data = await response.json();
-  return JSON.stringify(data);
-}
 
 export async function runGraphQLAgent(task: string): Promise<{
   result: string;
@@ -60,6 +13,9 @@ export async function runGraphQLAgent(task: string): Promise<{
   latencyMs: number;
   apiResponses: Array<{ query: string; response: unknown }>;
 }> {
+  const server = new GraphqlMcpServer();
+  const tools = await server.listTools();
+
   const startTime = performance.now();
   
   let apiCallCount = 0;
@@ -93,21 +49,35 @@ export async function runGraphQLAgent(task: string): Promise<{
         content: [],
       };
 
-      for (const block of response.content) {
-        if (block.type === "tool_use") {
+      const toolUseBlocks = response.content.filter(
+        (block) => block.type === "tool_use"
+      );
+
+      const results = await Promise.all(
+        toolUseBlocks.map(async (block) => {
+          if (block.type !== "tool_use") return null;
           apiCallCount++;
-          const input = block.input as { query: string };
-          const result = await callGraphQLApi(input.query);
-          apiResponses.push({
-            query: input.query,
-            response: JSON.parse(result),
-          });
-          (toolResults.content as Anthropic.ToolResultBlockParam[]).push({
-            type: "tool_result",
-            tool_use_id: block.id,
-            content: result,
-          });
-        }
+          const { content, metadata } = await server.callTool(
+            block.name,
+            block.input
+          );
+          return { block, result: content, metadata };
+        })
+      );
+
+      for (const res of results) {
+        if (!res) continue;
+        const { block, result, metadata } = res;
+
+        apiResponses.push({
+          query: (metadata?.query as string) || "",
+          response: JSON.parse(result),
+        });
+        (toolResults.content as Anthropic.ToolResultBlockParam[]).push({
+          type: "tool_result",
+          tool_use_id: block.id,
+          content: result,
+        });
       }
 
       messages.push({
@@ -135,4 +105,3 @@ export async function runGraphQLAgent(task: string): Promise<{
 
   throw new Error("Unexpected end of loop");
 }
-

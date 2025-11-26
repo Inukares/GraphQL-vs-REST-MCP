@@ -1,59 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { CLAUDE_MODEL, BASE_URL } from "../../shared/constants";
-import { REST_TOOLS } from "../definitions/rest-tools";
+import { CLAUDE_MODEL } from "../../shared/constants";
+import { RestMcpServer } from "../mcp/rest-server";
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
-
-async function callRestApi(toolName: string, toolInput: Record<string, string>): Promise<{ result: string; url: string }> {
-  let url: string;
-  let method = "GET";
-  let body: Record<string, string> | undefined;
-
-  switch (toolName) {
-    case "get_user":
-      url = `${BASE_URL}/rest/users/${toolInput.id}`;
-      break;
-    case "get_user_posts":
-      url = `${BASE_URL}/rest/users/${toolInput.userId}/posts`;
-      break;
-    case "get_post":
-      url = `${BASE_URL}/rest/posts/${toolInput.id}`;
-      break;
-    case "get_post_author":
-      url = `${BASE_URL}/rest/posts/${toolInput.postId}/author`;
-      break;
-    case "get_post_comments":
-      url = `${BASE_URL}/rest/posts/${toolInput.postId}/comments`;
-      break;
-    case "get_comment_author":
-      url = `${BASE_URL}/rest/comments/${toolInput.commentId}/author`;
-      break;
-    case "create_comment":
-      url = `${BASE_URL}/rest/comments`;
-      method = "POST";
-      body = toolInput;
-      break;
-    default:
-      throw new Error(`Unknown tool: ${toolName}`);
-  }
-
-  const options: RequestInit = {
-    method,
-    headers: {
-      "Content-Type": "application/json",
-    },
-  };
-
-  if (body) {
-    options.body = JSON.stringify(body);
-  }
-
-  const response = await fetch(url, options);
-  const data = await response.json();
-  return { result: JSON.stringify(data), url: `${method} ${url.replace(BASE_URL, "")}` };
-}
 
 export async function runRestAgent(task: string): Promise<{
   result: string;
@@ -62,6 +13,9 @@ export async function runRestAgent(task: string): Promise<{
   latencyMs: number;
   apiResponses: Array<{ tool: string; response: unknown; url: string }>;
 }> {
+  const server = new RestMcpServer();
+  const tools = await server.listTools();
+
   const startTime = performance.now();
   
   let apiCallCount = 0;
@@ -82,7 +36,7 @@ export async function runRestAgent(task: string): Promise<{
     const response = await anthropic.messages.create({
       model: CLAUDE_MODEL,
       max_tokens: 9000,
-      tools: REST_TOOLS,
+      tools,
       messages,
     });
 
@@ -103,11 +57,11 @@ export async function runRestAgent(task: string): Promise<{
         toolUseBlocks.map(async (block) => {
           if (block.type !== "tool_use") return null;
           apiCallCount++;
-          const { result, url } = await callRestApi(
+          const { content, metadata } = await server.callTool(
             block.name,
-            block.input as Record<string, string>
+            block.input
           );
-          return { block, result, url };
+          return { block, result: content, url: metadata?.url as string };
         })
       );
 
